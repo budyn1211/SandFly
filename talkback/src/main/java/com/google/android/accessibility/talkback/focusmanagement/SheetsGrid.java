@@ -242,6 +242,36 @@ public final class SheetsGrid {
         null);
   }
 
+  /**
+   * Returns the cell Sheets lists now under the address of {@code lostCell}, or null. Sheets lists
+   * its cells anew as the selection or the view changes, which drops the focused cell's node.
+   */
+  @Nullable
+  public static AccessibilityNodeInfoCompat sameCellListedAgain(
+      @Nullable AccessibilityNodeInfoCompat lostCell) {
+    Cell lost = cellOf(lostCell);
+    if (lost == null) {
+      return null;
+    }
+    List<AccessibilityNodeInfoCompat> cells = new ArrayList<>();
+    AccessibilityNodeInfoCompat grid = lostCell.getParent();
+    if (grid == null || !grid.refresh() || cellsOf(grid, cells) == 0) {
+      grid = findGrid(grid == null ? lostCell : grid);
+      if (grid == null) {
+        return null;
+      }
+      cells.clear();
+      cellsOf(grid, cells);
+    }
+    for (AccessibilityNodeInfoCompat node : cells) {
+      Cell listed = cellOf(node);
+      if (listed != null && listed.address.equals(lost.address)) {
+        return node;
+      }
+    }
+    return null;
+  }
+
   /** Returns whether the node is a Sheets cell, so row and column navigation work from it. */
   public static boolean isCell(@Nullable AccessibilityNodeInfoCompat node) {
     return cellOf(node) != null;

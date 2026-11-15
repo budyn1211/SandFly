@@ -349,6 +349,10 @@ public class FocusManagerInternal {
       return true;
     }
 
+    if (keepFocusOnSheetsCell(eventId)) {
+      return true;
+    }
+
     if (!FocusProcessorForScreenStateChange.focusesNewWindows()) {
       // Only replace focus that was lost on this screen, such as when the focused item is removed.
       return focusedSinceScreenChange(state) && requestA11yFocusFromLastFocusRecord(eventId);
@@ -428,6 +432,41 @@ public class FocusManagerInternal {
             .setAction(Focus.Action.FOCUS)
             .setFocusActionInfo(focusActionInfo)
             .setTarget(editField));
+  }
+
+  /**
+   * Keeps focus in the Google Sheets grid when Sheets lists its cells anew and drops the focused
+   * cell's node: the same cell gets focus back without being spoken again. Otherwise focus would
+   * go to the grid's range label, and the next swipe would start from there instead of the cell.
+   *
+   * @return true if focus is on the cell again, or a Sheets move in progress will place it
+   */
+  private boolean keepFocusOnSheetsCell(EventId eventId) {
+    @Nullable FocusActionRecord record = history.getLastFocusActionRecord();
+    AccessibilityNodeInfoCompat lastFocus = record == null ? null : record.getFocusedNode();
+    if (!SheetsGrid.isCell(lastFocus)) {
+      return false;
+    }
+    if (SheetsGrid.isMoving()) {
+      LogUtils.d(TAG, "EnsureOnScreen: Return, a Sheets move focuses the cell it finds.");
+      return true;
+    }
+    AccessibilityNodeInfoCompat cell = SheetsGrid.sameCellListedAgain(lastFocus);
+    if (cell == null) {
+      return false;
+    }
+    LogUtils.d(TAG, "EnsureOnScreen: Focus returns to the Sheets cell %s.", SheetsGrid.cellOf(cell));
+    FocusActionInfo focusActionInfo =
+        FocusActionInfo.builder()
+            .setForceMuteFeedback(true)
+            .setSourceAction(FocusActionInfo.ENSURE_ON_SCREEN)
+            .build();
+    return pipeline.returnFeedback(
+        eventId,
+        Focus.builder()
+            .setAction(Focus.Action.FOCUS)
+            .setFocusActionInfo(focusActionInfo)
+            .setTarget(cell));
   }
 
   /** Returns whether the last input was from a physical keyboard. */
